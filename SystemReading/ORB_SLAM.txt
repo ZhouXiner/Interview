@@ -22,6 +22,8 @@ https://blog.csdn.net/saber_altolia/article/details/52623513
 双目和RGB_D不需要，可以直接找有深度的点初始化，不需要两帧，也不需要联立
 
 ３.tracking
+tracking流程：
+https://www.notion.so/ORB-tracking-0e9802267de14c71929896e3b760a746
 这个说的很清楚：https://blog.csdn.net/qq_20123207/article/details/82587130
 1.假设匀速运动　　2.关键帧tracking 　3.当lost的时候，进行重定位(Epnp)
 如果不满足匀速运动的条件(速度为０，匹配太少，ID相差大，则用２)
@@ -32,17 +34,21 @@ lost条件：两帧之间match点太少，此时扩大上一帧的地图点投�
 关于BOW向量用于tracking:https://blog.csdn.net/KYJL888/article/details/102588059
 也就是说ORB中维护了一个feature的词袋，用于匹配，每个描述子对应一个单词
 匹配时采用了正向匹配和逆向匹配两种，进行加速
-正向匹配：用第二层或者第三层作为父节点进行匹配(针对feature用)
+正向匹配：用第二层或者第三层作为父节点进行匹配(记录frame访问了哪些node)
+对每个frame,都记录这个信息:描述子对应的Bow中的node编号和对应的features
+这样在匹配时，如果两个frame都访问了同一个node，就把对应的features都拿出来看看哪些feature能够匹配的上(描述子距离)
+
 逆向匹配：用于回环和重定位(反向索引记录每个叶节点对应的图像编号)
+
+
 即对于这个字典，有两种，一种是从图片查单词（每张图片有哪些单词，
 以及单词对应的图片上特征点的具体编号）
 另一种是从单词查图片（每个单词在哪些图片被观测到，以及这个单词在这张图片的权重）
 
-
 运动模型和关键帧模型的区别：
 (1)、运动模型跟踪利用上一帧姿态和速度来初始化当前帧位姿，参考帧模型仅仅使用上一帧位姿来初始化当前帧位姿。
 (2)、运动模型跟踪利用投影匹配，参考帧模型使用词袋匹配。
-(3)、运动模型跟踪需要考虑是否为纯跟踪模式，而参考关键帧跟踪则不需要。
+(3)、运动模型跟踪需要考虑是否为纯跟踪模式（判断mtach点是否足够时，onlytracking的条件放宽），而参考关键帧跟踪则不需要。
 (4)、运动模型跟踪与上一帧进行匹配，而参考关键帧跟踪则是与参考关键帧进行匹配。
 
 重定位(三次定位，三次优化)：
@@ -84,7 +90,8 @@ Essential Graph的概念，主要用它来进行全局位姿优化。它是共�
 
 Local Mapping:
 https://www.cnblogs.com/liumantang/p/11830376.html
-tracking中，我们经历了初始化，三种方式的tracking，lm的BA和关键帧的选择，
+tracking中，我们经历了初始化，三种方式的tracking，lm的BA(这里是指当构建local map后，会在local map中搜索当前帧能够匹配上的地图点，然后再pose optimization)
+和关键帧的选择，
 终于到了LM
 Local Mapping主要做以下几件事：
 1.处理新的关键帧
@@ -124,4 +131,11 @@ Loop Fusion阶段，第一步是融合重复的地图点，并且在covisibility
 及周围关键帧的位置姿态，这样回环的两头就基本对齐了。
 然后再把回环关键帧附近的地图点投影到新关键帧，把匹配上的地图点融合起来。
 然后基于基本图进行全局位姿优化
+
+比较好的对loop closure解释：
+https://www.notion.so/bd6c965c651241e0a3fc87c791fda9d8
+1.基于ransac，得到与候选帧之间的sim3 pose
+2.重投影，优化sim3
+3.更新local map中的pose 
+4.将essential graph和最小生成树(确保整个地图都被优化)一起进行gba
 
